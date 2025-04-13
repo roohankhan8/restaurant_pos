@@ -1,25 +1,45 @@
 import tkinter as tk
 from tkinter import ttk
+import csv # Import the csv module
 
 class RestaurantPOS:
     def __init__(self, root):
         self.root = root
         self.root.title("Restaurant POS System")
 
-        self.menu_items = {
-            "Appetizers": {"Soup": 5.99, "Salad": 7.49, "Bruschetta": 6.29},
-            "Main Courses": {"Steak": 19.99, "Pasta Carbonara": 14.50, "Salmon": 17.75, "Pizza": 12.99},
-            "Desserts": {"Cake": 6.50, "Ice Cream": 4.75, "Brownie": 5.25},
-            "Drinks": {"Soda": 2.00, "Juice": 3.50, "Coffee": 3.00, "Tea": 2.50},
-        }
+        self.menu_items = self.load_menu_from_csv('menu.csv') # Load menu from CSV
         self.current_category = tk.StringVar(self.root)
-        self.current_category.set(list(self.menu_items.keys())[0]) # Set initial category
+        if self.menu_items:
+            self.current_category.set(list(self.menu_items.keys())[0]) # Set initial category
+        else:
+            self.current_category.set("") # Or some default if menu is empty
         self.order = {} # Dictionary to store order items with quantities
         self._order_display_list = [] # Separate list to track order for display
         self.total = tk.DoubleVar(self.root, value=0.00) # Variable to hold the order total
 
         self.setup_ui()
-        self.show_menu_items(self.current_category.get()) # Show initial category items
+        if self.menu_items:
+            self.show_menu_items(self.current_category.get())
+
+    def load_menu_from_csv(self, filename):
+        menu = {}
+        try:
+            with open(filename, 'r', newline='') as csvfile:
+                reader = csv.DictReader(csvfile)
+                for row in reader:
+                    category = row['Category'].strip()
+                    item = row['Item'].strip()
+                    try:
+                        price = float(row['Price'].strip())
+                        if category not in menu:
+                            menu[category] = {}
+                        menu[category][item] = price
+                    except ValueError:
+                        print(f"Warning: Invalid price '{row['Price']}' for item '{item}'. Skipping.")
+        except FileNotFoundError:
+            print(f"Error: Menu file '{filename}' not found.")
+            return {}
+        return menu
 
     def setup_ui(self):
         # --- Frames ---
@@ -97,30 +117,6 @@ class RestaurantPOS:
         for i in range(row_num + 1):
             self.item_buttons_frame.grid_rowconfigure(i, weight=1)
 
-    # def add_to_order(self, item_name, price):
-    #     self.order.append({"name": item_name, "price": price})
-    #     self.update_order_display()
-
-    def update_order_display(self):
-        self.order_list.delete(0, tk.END) # Clear the current listbox
-        current_total = 0
-        for item_name, details in self.order.items():
-            quantity = details['quantity']
-            price = details['price']
-            item_total = quantity * price
-            self.order_list.insert(tk.END, f"{item_name} x {quantity} - ${item_total:.2f}")
-            current_total += item_total
-        self.total.set(current_total)
-        self.total_label.config(text=f"Total: ${self.total.get():.2f}")
-
-    # def add_item_to_order(self):
-    #     # For now, we'll assume the user selects an item in the menu and then clicks "Add Item"
-    #     # We'll refine this later to be more direct.
-    #     selected_index = self.order_list.curselection()
-    #     if selected_index:
-    #         selected_item = self.order[selected_index[0]]
-    #         self.add_to_order(selected_item['name'], selected_item['price'])
-    
     def add_to_order(self, item_name, price):
         if item_name in self.order:
             self.order[item_name]['quantity'] += 1
@@ -134,6 +130,18 @@ class RestaurantPOS:
         for item_name, details in self.order.items():
             for _ in range(details['quantity']):
                 self._order_display_list.append(item_name)
+    
+    def update_order_display(self):
+        self.order_list.delete(0, tk.END) # Clear the current listbox
+        current_total = 0
+        for item_name, details in self.order.items():
+            quantity = details['quantity']
+            price = details['price']
+            item_total = quantity * price
+            self.order_list.insert(tk.END, f"{item_name} x {quantity} - ${item_total:.2f}")
+            current_total += item_total
+        self.total.set(current_total)
+        self.total_label.config(text=f"Total: ${self.total.get():.2f}")
 
     def remove_item_from_order(self):
         selected_index = self.order_list.curselection()
@@ -145,7 +153,7 @@ class RestaurantPOS:
                     self.order[item_to_remove]['quantity'] -= 1
                     if self.order[item_to_remove]['quantity'] == 0:
                         del self.order[item_to_remove]
-                self._update_order_display_list() # Keep the display list consistent
+                self._update_order_display_list()
                 self.update_order_display()
                 print(f"Removed one {item_to_remove}")
 
@@ -159,7 +167,6 @@ class RestaurantPOS:
     def checkout(self):
         total = self.total.get()
         print(f"Total amount due: ${total:.2f}")
-        # In a real application, you would implement payment processing here
         tk.messagebox.showinfo("Checkout", f"Total amount due: ${total:.2f}\nPayment processing not implemented.")
 
 if __name__ == "__main__":
